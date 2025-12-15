@@ -180,6 +180,61 @@ function App() {
     setFormData({});
   };
 
+  // Clear Canvas: Reset nodes and edges
+  const clearCanvas = () => {
+    if (nodes.length === 0 && edges.length === 0) {
+      alert('Canvas is already empty!');
+      return;
+    }
+    if (window.confirm('Are you sure you want to clear the entire canvas? This action cannot be undone.')) {
+      setNodes([]);
+      setEdges([]);
+    }
+  };
+
+  // Save Diagram to localStorage
+  const saveDiagram = () => {
+    if (nodes.length === 0 && edges.length === 0) {
+      alert('Cannot save an empty diagram!');
+      return;
+    }
+    const diagram = {
+      nodes,
+      edges,
+      defaultPipeProps,
+      timestamp: new Date().toISOString()
+    };
+    localStorage.setItem('pid-flow-diagram', JSON.stringify(diagram));
+    alert('Diagram saved successfully!');
+  };
+
+  // Load Diagram from localStorage
+  const loadDiagram = () => {
+    const saved = localStorage.getItem('pid-flow-diagram');
+    if (!saved) {
+      alert('No saved diagram found!');
+      return;
+    }
+
+    if (nodes.length > 0 || edges.length > 0) {
+      if (!window.confirm('Loading will replace the current diagram. Continue?')) {
+        return;
+      }
+    }
+
+    try {
+      const diagram = JSON.parse(saved);
+      setNodes(diagram.nodes || []);
+      setEdges(diagram.edges || []);
+      if (diagram.defaultPipeProps) {
+        setDefaultPipeProps(diagram.defaultPipeProps);
+      }
+      alert(`Diagram loaded successfully!\nSaved: ${diagram.timestamp ? new Date(diagram.timestamp).toLocaleString() : 'Unknown date'}`);
+    } catch (error) {
+      alert('Error loading diagram: Invalid format');
+    }
+  };
+
   // Conditional form fields based on type
   const renderFormFields = () => {
     if (!currentItem) return null;
@@ -455,10 +510,68 @@ function App() {
             borderRadius: '4px',
             cursor: 'pointer',
             fontWeight: 'bold',
-            fontSize: '12px'
+            fontSize: '12px',
+            marginBottom: '10px'
           }}
         >
           Set Pipe Defaults
+        </button>
+
+        <hr style={{ margin: '15px 0', border: 'none', borderTop: '1px solid #ddd' }} />
+
+        <h3 style={{ margin: '0 0 10px 0', fontSize: '14px' }}>Tools</h3>
+
+        <button
+          onClick={clearCanvas}
+          style={{
+            width: '100%',
+            padding: '10px',
+            background: '#f44336',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            fontSize: '12px',
+            marginBottom: '8px'
+          }}
+        >
+          Clear Canvas
+        </button>
+
+        <button
+          onClick={saveDiagram}
+          style={{
+            width: '100%',
+            padding: '10px',
+            background: '#4CAF50',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            fontSize: '12px',
+            marginBottom: '8px'
+          }}
+        >
+          Save Diagram
+        </button>
+
+        <button
+          onClick={loadDiagram}
+          style={{
+            width: '100%',
+            padding: '10px',
+            background: '#FF9800',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            fontSize: '12px'
+          }}
+        >
+          Load Diagram
         </button>
       </div>
 
