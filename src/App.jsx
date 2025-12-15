@@ -57,12 +57,24 @@ function App() {
 
   // Modal state for property editing
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [currentItem, setCurrentItem] = useState(null); // Node or Edge being edited
+  const [currentItem, setCurrentItem] = useState(null); // Node, Edge, or 'defaults' being edited
   const [formData, setFormData] = useState({}); // Temp state for editing
 
+  // Global pipe defaults
+  const [defaultPipeProps, setDefaultPipeProps] = useState({
+    D: 0.1,           // m - diameter
+    L: 100,           // m - length
+    rho: 1000,        // kg/m³ - density
+    epsilon: 0.00015, // m - roughness
+  });
+
   const onConnect = useCallback(
-    (params) => setEdges((eds) => addEdge({ ...params, type: 'pipe' }, eds)),
-    [setEdges]
+    (params) => {
+      // Inherit defaults for new edges
+      const newEdge = { ...params, type: 'pipe', data: { ...defaultPipeProps } };
+      setEdges((eds) => addEdge(newEdge, eds));
+    },
+    [setEdges, defaultPipeProps]
   );
 
   // Handle drag/drop from sidebar
@@ -96,23 +108,56 @@ function App() {
   // Open modal on edge click
   const onEdgeClick = useCallback((event, edge) => {
     setCurrentItem({ ...edge, isNode: false });
-    setFormData(edge.data || {});
+    setFormData(edge.data || defaultPipeProps);
     setIsModalOpen(true);
-  }, []);
+  }, [defaultPipeProps]);
+
+  // Open global pipe defaults modal
+  const openDefaultsModal = () => {
+    setCurrentItem({ type: 'defaults' });
+    setFormData({ ...defaultPipeProps, applyToAll: false });
+    setIsModalOpen(true);
+  };
 
   // Handle form input changes
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type: inputType, checked } = e.target;
     const numericFields = ['P', 'z', 'h_a', 'D', 'L', 'rho', 'epsilon', 'K'];
+
+    let processedValue;
+    if (inputType === 'checkbox') {
+      processedValue = checked;
+    } else if (numericFields.includes(name)) {
+      processedValue = value === '' ? 0 : parseFloat(value) || 0;
+    } else {
+      processedValue = value;
+    }
+
     setFormData((prev) => ({
       ...prev,
-      [name]: numericFields.includes(name) ? parseFloat(value) || 0 : value
+      [name]: processedValue
     }));
   };
 
   // Save changes
   const handleSave = () => {
-    if (currentItem.isNode) {
+    if (currentItem.type === 'defaults') {
+      // Update global defaults
+      const newDefaults = {
+        D: formData.D,
+        L: formData.L,
+        rho: formData.rho,
+        epsilon: formData.epsilon
+      };
+      setDefaultPipeProps(newDefaults);
+
+      // Optionally apply to all existing edges
+      if (formData.applyToAll) {
+        setEdges((eds) =>
+          eds.map((e) => ({ ...e, data: { ...e.data, ...newDefaults } }))
+        );
+      }
+    } else if (currentItem.isNode) {
       setNodes((nds) =>
         nds.map((n) =>
           n.id === currentItem.id ? { ...n, data: { ...n.data, ...formData } } : n
@@ -138,6 +183,81 @@ function App() {
   // Conditional form fields based on type
   const renderFormFields = () => {
     if (!currentItem) return null;
+
+    // Handle defaults modal
+    if (currentItem.type === 'defaults') {
+      return (
+        <>
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+              Default Diameter D (m):
+            </label>
+            <input
+              type="number"
+              name="D"
+              value={formData.D !== undefined ? formData.D : 0.1}
+              onChange={handleInputChange}
+              style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+              step="0.01"
+            />
+          </div>
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+              Default Length L (m):
+            </label>
+            <input
+              type="number"
+              name="L"
+              value={formData.L !== undefined ? formData.L : 100}
+              onChange={handleInputChange}
+              style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+              step="1"
+            />
+          </div>
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+              Default Density ρ (kg/m³):
+            </label>
+            <input
+              type="number"
+              name="rho"
+              value={formData.rho !== undefined ? formData.rho : 1000}
+              onChange={handleInputChange}
+              style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+              step="1"
+            />
+          </div>
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+              Default Roughness ε (m):
+            </label>
+            <input
+              type="number"
+              name="epsilon"
+              value={formData.epsilon !== undefined ? formData.epsilon : 0.00015}
+              onChange={handleInputChange}
+              style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+              step="0.00001"
+            />
+          </div>
+          <div style={{ marginBottom: '15px', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#f9f9f9' }}>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                name="applyToAll"
+                checked={formData.applyToAll || false}
+                onChange={handleInputChange}
+                style={{ marginRight: '8px' }}
+              />
+              Apply to All Existing Pipes
+            </label>
+            <p style={{ color: '#d32f2f', fontSize: '12px', margin: '5px 0 0 0' }}>
+              ⚠️ Warning: This will overwrite all pipe-specific settings!
+            </p>
+          </div>
+        </>
+      );
+    }
 
     if (currentItem.isNode) {
       switch (currentItem.type) {
@@ -284,11 +404,10 @@ function App() {
             <input
               type="number"
               name="epsilon"
-              value={formData.epsilon || 0.00015}
+              value={formData.epsilon !== undefined ? formData.epsilon : 0.00015}
               onChange={handleInputChange}
               style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
               step="0.00001"
-              min="0"
             />
           </div>
         </>
@@ -322,6 +441,25 @@ function App() {
         >
           Valve
         </div>
+
+        <hr style={{ margin: '15px 0', border: 'none', borderTop: '1px solid #ddd' }} />
+
+        <button
+          onClick={openDefaultsModal}
+          style={{
+            width: '100%',
+            padding: '10px',
+            background: '#4477ff',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            fontSize: '12px'
+          }}
+        >
+          Set Pipe Defaults
+        </button>
       </div>
 
       {/* Canvas */}
@@ -380,9 +518,11 @@ function App() {
             }}
           >
             <h3 style={{ marginTop: 0, marginBottom: '20px' }}>
-              Edit {currentItem?.isNode
-                ? `${currentItem.data?.label || currentItem.type} Properties`
-                : 'Pipe Properties'
+              {currentItem?.type === 'defaults'
+                ? 'Set Global Pipe Defaults'
+                : currentItem?.isNode
+                ? `Edit ${currentItem.data?.label || currentItem.type} Properties`
+                : 'Edit Pipe Properties'
               }
             </h3>
 
