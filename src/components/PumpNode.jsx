@@ -11,7 +11,7 @@ export default function PumpNode({ data }) {
         position={Position.Left}
         id="inlet"
         style={{
-          top: '50%',
+          top: '41%',
           left: '-2px',
           width: '8px',
           height: '8px',
@@ -191,7 +191,7 @@ export default function PumpNode({ data }) {
         position={Position.Right}
         id="outlet"
         style={{
-          top: '50%',
+          top: '41%',
           right: '-2px',
           width: '8px',
           height: '8px',
