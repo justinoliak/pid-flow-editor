@@ -1,16 +1,79 @@
-# React + Vite
+# P&ID Flow Editor
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A visual P&ID (Piping and Instrumentation Diagram) editor focused on teaching transport phenomena. Built with React and React Flow for interactive diagram creation.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Visual Component Palette**: Drag-and-drop interface with professional industrial components
+- **Industrial Components**:
+  - Tank nodes with animated liquid levels and metallic styling
+  - Pump nodes with rotation animations and flow indicators
+  - Gate valve nodes with position indicators and flow visualization
+- **Interactive Canvas**: Pan, zoom, and connect components with pipe-like edges
+- **Professional Styling**: Industrial-grade SVG graphics with realistic animations
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **React** 19.2.0 - Modern React with hooks
+- **React Flow** 11.11.4 - Interactive node-based editor
+- **Vite** - Fast development and build tool
+- **SVG Graphics** - Custom industrial component designs
 
-## Expanding the ESLint configuration
+## Development
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Lint code
+npm run lint
+```
+
+## Project Structure
+
+```
+src/
+├── App.jsx                 # Main application with React Flow canvas
+├── App.css                 # Application styling
+├── components/
+│   ├── TankNode.jsx         # Professional tank component with animations
+│   ├── PumpNode.jsx         # Centrifugal pump with rotation
+│   └── ValveNode.jsx        # Gate valve with position control
+└── main.jsx                 # Application entry point
+
+public/
+└── pipe_flow_solver.py      # Python solver for future integration
+```
+
+## Usage
+
+1. **Component Placement**: Drag components from the left sidebar to the canvas
+2. **Connections**: Click and drag between component handles to create pipe connections
+3. **Navigation**: Use controls to zoom, pan, and navigate the diagram
+4. **Minimap**: Overview of entire diagram in bottom-right corner
+
+## Future Enhancements
+
+- Integration with Python solver for flow calculations
+- Real-time flow simulation and visualization
+- Component property editing
+- Export functionality for diagrams
+- Educational tutorials and examples
+
+## Educational Context
+
+Designed for CHME 2310 - Transport Processes I, focusing on:
+- Mechanical Energy Balance concepts
+- Pipe flow analysis
+- Pump system design
+- Interactive learning through visualization
+
+---
+
+Built with React Flow for educational purposes in chemical engineering transport phenomena.
