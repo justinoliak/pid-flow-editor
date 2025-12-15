@@ -132,7 +132,20 @@ function App() {
     setIsGlobalModalOpen(true);
   };
 
-  // Close global settings modal
+  // Save global settings and update existing tanks
+  const saveGlobalSettings = () => {
+    // Update all existing tank nodes with the new fluid type
+    setNodes((nds) =>
+      nds.map((node) =>
+        node.type === 'tank'
+          ? { ...node, data: { ...node.data, fluidType: globalFluid } }
+          : node
+      )
+    );
+    setIsGlobalModalOpen(false);
+  };
+
+  // Close global settings modal without saving
   const closeGlobalSettingsModal = () => {
     setIsGlobalModalOpen(false);
   };
@@ -864,13 +877,13 @@ function App() {
             </div>
 
             <p style={{ fontSize: '12px', color: '#666', marginBottom: '15px' }}>
-              This fluid type will be automatically assigned to new tanks.
+              This fluid type will be applied to ALL existing tanks and automatically assigned to new tanks.
               Individual tanks can still be customized after creation.
             </p>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
               <button
-                onClick={closeGlobalSettingsModal}
+                onClick={saveGlobalSettings}
                 style={{
                   padding: '10px 20px',
                   background: '#4CAF50',
