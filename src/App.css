@@ -167,7 +167,13 @@ html, body, #root {
 /* Pipe flow animation */
 @keyframes pipe-flow {
   0% { stroke-dashoffset: 0; }
-  100% { stroke-dashoffset: -30; }
+  100% { stroke-dashoffset: -15; }
+}
+
+/* Flow animation class for easier application */
+.pipe-flowing {
+  animation: pipe-flow 2s linear infinite;
+  stroke-dasharray: 10,5;
 }
 
 /* Enhanced pipe styling */

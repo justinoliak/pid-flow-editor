@@ -252,6 +252,40 @@ function App() {
       setSolverResults(results);
       console.log('Mock Solver Results:', results);
 
+      // Apply flow animation to edges based on solver results
+      if (results.Q > 0) {
+        setEdges((eds) =>
+          eds.map((edge) => {
+            // Calculate animation duration based on velocity (faster flow = faster animation)
+            const velocity = results.v_avg || 1;
+            const animationDuration = Math.max(0.5, 3 / velocity); // Min 0.5s, scales inversely with velocity
+
+            return {
+              ...edge,
+              animated: true, // React Flow's built-in animation
+              style: {
+                ...edge.style,
+                strokeDasharray: '10,5', // Ensure dashed pattern for flow effect
+                animation: `pipe-flow ${animationDuration}s linear infinite`,
+              },
+            };
+          })
+        );
+      } else {
+        // No flow: Remove animation
+        setEdges((eds) =>
+          eds.map((edge) => ({
+            ...edge,
+            animated: false,
+            style: {
+              ...edge.style,
+              animation: 'none',
+              strokeDasharray: '0', // Remove dashes when no flow
+            },
+          }))
+        );
+      }
+
       alert(`Solver completed successfully!\n` +
             `Flow Rate: ${results.Q.toFixed(4)} m³/s (${results.Q_mass.toFixed(2)} kg/s)\n` +
             `Average Velocity: ${results.v_avg.toFixed(2)} m/s\n` +
