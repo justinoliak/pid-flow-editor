@@ -29,7 +29,17 @@ const nodeTypes = {
 
 // Solver constants for dropdowns
 const fluidTypes = ['water_20C', 'water_100F', 'water_60F', 'water_10C', 'air_20C', 'air_80C', 'toluene_114C'];
-const valveKTypes = ['elbow_90_flanged', 'elbow_90_threaded', 'valve_globe_open', 'valve_gate_open', 'entrance_square', 'exit'];
+const valveKTypes = [
+  'valve_globe_open',
+  'valve_globe_half_open',
+  'valve_angle_open',
+  'valve_gate_open',
+  'valve_gate_1/4_closed',
+  'valve_gate_1/2_closed',
+  'valve_gate_3/4_closed',
+  'valve_ball_open',
+  'valve_check_swing'
+];
 
 // Sorted fitting types for minor losses
 const fittingTypes = [
