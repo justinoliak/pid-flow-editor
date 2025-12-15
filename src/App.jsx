@@ -102,6 +102,12 @@ function App() {
   // Global fluid settings
   const [globalFluid, setGlobalFluid] = useState('water_20C');
 
+  // Global flow rate settings
+  const [flowRateSettings, setFlowRateSettings] = useState({
+    type: 'unknown', // 'volumetric', 'mass', or 'unknown'
+    value: 0.01,     // m³/s or kg/s (when not unknown)
+  });
+
   // Fittings modal state
   const [isFittingsModalOpen, setIsFittingsModalOpen] = useState(false);
   const [selectedEdgeId, setSelectedEdgeId] = useState(null);
@@ -160,7 +166,7 @@ function App() {
   // Open global pipe defaults modal
   const openDefaultsModal = () => {
     setCurrentItem({ type: 'defaults' });
-    setFormData({ ...defaultPipeProps, globalFluid });
+    setFormData({ ...defaultPipeProps, globalFluid, flowRateSettings });
     setIsModalOpen(true);
   };
 
@@ -229,6 +235,7 @@ function App() {
       })),
       defaultPipeProps,
       globalFluid,
+      flowRateSettings,
       timestamp: new Date().toISOString()
     };
     console.log('Serialized Graph for Solver:', JSON.stringify(graph, null, 2));
@@ -240,7 +247,7 @@ function App() {
   // Handle form input changes
   const handleInputChange = (e) => {
     const { name, value, type: inputType, checked } = e.target;
-    const numericFields = ['P', 'z', 'h_a', 'D', 'L', 'rho', 'epsilon', 'K'];
+    const numericFields = ['P', 'z', 'h_a', 'D', 'L', 'rho', 'epsilon', 'K', 'flowValue'];
 
     let processedValue;
     if (inputType === 'checkbox') {
@@ -254,6 +261,17 @@ function App() {
     setFormData((prev) => ({
       ...prev,
       [name]: processedValue
+    }));
+  };
+
+  // Handle flow rate changes (special handler for nested object)
+  const handleFlowRateChange = (field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      flowRateSettings: {
+        ...prev.flowRateSettings,
+        [field]: field === 'value' ? (parseFloat(value) || 0) : value
+      }
     }));
   };
 
@@ -280,6 +298,11 @@ function App() {
               : node
           )
         );
+      }
+
+      // Update global flow rate settings
+      if (formData.flowRateSettings) {
+        setFlowRateSettings(formData.flowRateSettings);
       }
 
       // Apply to all existing edges
@@ -331,6 +354,8 @@ function App() {
       nodes,
       edges,
       defaultPipeProps,
+      globalFluid,
+      flowRateSettings,
       timestamp: new Date().toISOString()
     };
     localStorage.setItem('pid-flow-diagram', JSON.stringify(diagram));
@@ -357,6 +382,12 @@ function App() {
       setEdges(diagram.edges || []);
       if (diagram.defaultPipeProps) {
         setDefaultPipeProps(diagram.defaultPipeProps);
+      }
+      if (diagram.globalFluid) {
+        setGlobalFluid(diagram.globalFluid);
+      }
+      if (diagram.flowRateSettings) {
+        setFlowRateSettings(diagram.flowRateSettings);
       }
       alert(`Diagram loaded successfully!\nSaved: ${diagram.timestamp ? new Date(diagram.timestamp).toLocaleString() : 'Unknown date'}`);
     } catch (error) {
@@ -452,6 +483,70 @@ function App() {
               {fluidTypes.map((type) => <option key={type} value={type}>{type}</option>)}
             </select>
             <small style={{ color: '#666' }}>This fluid type will be applied to ALL existing tanks and automatically assigned to new tanks.</small>
+          </div>
+
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+              Flow Rate:
+            </label>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <input
+                  type="radio"
+                  name="flowRateType"
+                  value="unknown"
+                  checked={formData.flowRateSettings?.type === 'unknown'}
+                  onChange={(e) => handleFlowRateChange('type', e.target.value)}
+                />
+                Unknown
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <input
+                  type="radio"
+                  name="flowRateType"
+                  value="volumetric"
+                  checked={formData.flowRateSettings?.type === 'volumetric'}
+                  onChange={(e) => handleFlowRateChange('type', e.target.value)}
+                />
+                Volumetric (m³/s)
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <input
+                  type="radio"
+                  name="flowRateType"
+                  value="mass"
+                  checked={formData.flowRateSettings?.type === 'mass'}
+                  onChange={(e) => handleFlowRateChange('type', e.target.value)}
+                />
+                Mass (kg/s)
+              </label>
+            </div>
+            <input
+              type="number"
+              step="0.001"
+              min="0"
+              value={formData.flowRateSettings?.value || 0}
+              onChange={(e) => handleFlowRateChange('value', e.target.value)}
+              placeholder={
+                formData.flowRateSettings?.type === 'unknown' ? 'Flow rate (to be determined by solver)' :
+                formData.flowRateSettings?.type === 'mass' ? 'Mass flow rate (kg/s)' : 'Volumetric flow rate (m³/s)'
+              }
+              disabled={formData.flowRateSettings?.type === 'unknown'}
+              style={{
+                width: '100%',
+                padding: '8px',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+                backgroundColor: formData.flowRateSettings?.type === 'unknown' ? '#f5f5f5' : 'white'
+              }}
+            />
+            <small style={{ color: '#666' }}>
+              {formData.flowRateSettings?.type === 'unknown'
+                ? 'Flow rate will be calculated by the solver'
+                : formData.flowRateSettings?.type === 'mass'
+                ? 'Total mass flow rate through the system'
+                : 'Total volumetric flow rate through the system'}
+            </small>
           </div>
 
         </>
@@ -733,7 +828,7 @@ function App() {
           style={{
             width: '100%',
             padding: '10px',
-            background: '#4477ff',
+            background: '#007bff',
             color: 'white',
             border: 'none',
             borderRadius: '4px',
@@ -751,7 +846,7 @@ function App() {
           style={{
             width: '100%',
             padding: '10px',
-            background: '#ff6b35',
+            background: '#007bff',
             color: 'white',
             border: 'none',
             borderRadius: '4px',
@@ -768,18 +863,18 @@ function App() {
           onClick={handleSolve}
           style={{
             width: '100%',
-            padding: '12px',
-            background: '#28a745',
+            padding: '10px',
+            background: '#007bff',
             color: 'white',
             border: 'none',
             borderRadius: '4px',
             cursor: 'pointer',
             fontWeight: 'bold',
-            fontSize: '14px',
+            fontSize: '12px',
             marginBottom: '10px'
           }}
         >
-          🔬 Solve System
+          Solve System
         </button>
 
         <hr style={{ margin: '15px 0', border: 'none', borderTop: '1px solid #ddd' }} />
