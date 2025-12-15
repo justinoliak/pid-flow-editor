@@ -15,6 +15,7 @@ import './App.css';
 import TankNode from './components/TankNode';
 import PumpNode from './components/PumpNode';
 import ValveNode from './components/ValveNode';
+import CustomPipeEdge from './components/CustomPipeEdge';
 
 // Mock solver
 import { mockSolver } from './utils/mockSolver';
@@ -62,26 +63,7 @@ const fittingTypes = [
 
 // Custom edge types for pipe-like connections
 const edgeTypes = {
-  pipe: (props) => (
-    <g>
-      {/* Black border/outline */}
-      <SmoothStepEdge
-        {...props}
-        style={{
-          stroke: '#000',
-          strokeWidth: 8,
-        }}
-      />
-      {/* Blue pipe interior */}
-      <SmoothStepEdge
-        {...props}
-        style={{
-          stroke: '#4A90E2',
-          strokeWidth: 6,
-        }}
-      />
-    </g>
-  ),
+  pipe: CustomPipeEdge,
 };
 
 function App() {
@@ -258,29 +240,39 @@ function App() {
           eds.map((edge) => {
             // Calculate animation duration based on velocity (faster flow = faster animation)
             const velocity = results.v_avg || 1;
-            const animationDuration = Math.max(0.5, 3 / velocity); // Min 0.5s, scales inversely with velocity
+            const animationDuration = Math.max(0.1, 0.8 / velocity); // Min 0.1s, much faster animation
 
             return {
               ...edge,
-              animated: true, // React Flow's built-in animation
+              type: 'pipe',
+              animated: true,
               style: {
                 ...edge.style,
-                strokeDasharray: '10,5', // Ensure dashed pattern for flow effect
-                animation: `pipe-flow ${animationDuration}s linear infinite`,
+                strokeDasharray: '10,5', // Dashed for inner flow
+                animation: `pipe-flow ${animationDuration}s linear infinite`, // Applied to inner path
+              },
+              data: {
+                ...edge.data,
+                label: `${results.Q.toFixed(3)} m³/s`,
               },
             };
           })
         );
       } else {
-        // No flow: Remove animation
+        // No flow: Remove dashes and animation
         setEdges((eds) =>
           eds.map((edge) => ({
             ...edge,
+            type: 'pipe',
             animated: false,
             style: {
               ...edge.style,
+              strokeDasharray: 'none',
               animation: 'none',
-              strokeDasharray: '0', // Remove dashes when no flow
+            },
+            data: {
+              ...edge.data,
+              label: 'No Flow',
             },
           }))
         );
