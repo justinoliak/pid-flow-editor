@@ -313,6 +313,21 @@ function App() {
               step="0.00001"
             />
           </div>
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+              Default Pipe Shape:
+            </label>
+            <select
+              name="shape"
+              value={formData.shape || 'circular'}
+              onChange={handleInputChange}
+              style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+            >
+              <option value="circular">Circular</option>
+              <option value="rectangular">Rectangular</option>
+              <option value="annular">Annular</option>
+            </select>
+          </div>
           <div style={{ marginBottom: '15px', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#f9f9f9' }}>
             <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
               <input
