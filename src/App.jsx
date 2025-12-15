@@ -105,8 +105,17 @@ function App() {
 
   const onConnect = useCallback(
     (params) => {
-      // Inherit defaults for new edges
-      const newEdge = { ...params, type: 'pipe', data: { ...defaultPipeProps } };
+      // Inherit defaults for new edges with default animation
+      const newEdge = {
+        ...params,
+        type: 'pipe',
+        data: { ...defaultPipeProps },
+        animated: true,
+        style: {
+          strokeDasharray: '10,5',
+          animation: 'pipe-flow 0.5s linear infinite',
+        }
+      };
       setEdges((eds) => addEdge(newEdge, eds));
     },
     [setEdges, defaultPipeProps]
