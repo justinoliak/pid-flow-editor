@@ -12,7 +12,7 @@ export default function ValveNode({ data }) {
         position={Position.Left}
         id="inlet"
         style={{
-          top: '60%',
+          top: '39%',
           left: '-2px',
           width: '8px',
           height: '8px',
@@ -229,7 +229,7 @@ export default function ValveNode({ data }) {
         position={Position.Right}
         id="outlet"
         style={{
-          top: '60%',
+          top: '39%',
           right: '-2px',
           width: '8px',
           height: '8px',

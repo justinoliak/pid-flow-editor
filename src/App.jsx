@@ -66,7 +66,12 @@ function App() {
     L: 100,           // m - length
     rho: 1000,        // kg/m³ - density
     epsilon: 0.00015, // m - roughness
+    shape: 'circular', // pipe shape
   });
+
+  // Global fluid settings
+  const [globalFluid, setGlobalFluid] = useState('water_20C');
+  const [isGlobalModalOpen, setIsGlobalModalOpen] = useState(false);
 
   const onConnect = useCallback(
     (params) => {
@@ -93,7 +98,10 @@ function App() {
       id: `${type}-${nodes.length + 1}`,
       type,
       position,
-      data: { label: `${type.charAt(0).toUpperCase() + type.slice(1)}` }, // e.g., "Tank"
+      data: {
+        label: `${type.charAt(0).toUpperCase() + type.slice(1)}`,
+        ...(type === 'tank' && { fluidType: globalFluid, P: 101325, z: 0 })
+      },
     };
     setNodes((nds) => nds.concat(newNode));
   };
@@ -117,6 +125,16 @@ function App() {
     setCurrentItem({ type: 'defaults' });
     setFormData({ ...defaultPipeProps, applyToAll: false });
     setIsModalOpen(true);
+  };
+
+  // Open global settings modal
+  const openGlobalSettingsModal = () => {
+    setIsGlobalModalOpen(true);
+  };
+
+  // Close global settings modal
+  const closeGlobalSettingsModal = () => {
+    setIsGlobalModalOpen(false);
   };
 
   // Handle form input changes
@@ -412,18 +430,103 @@ function App() {
         <>
           <div style={{ marginBottom: '15px' }}>
             <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-              Diameter D (m):
+              Pipe Shape:
             </label>
-            <input
-              type="number"
-              name="D"
-              value={formData.D || 0.1}
+            <select
+              name="shape"
+              value={formData.shape || 'circular'}
               onChange={handleInputChange}
               style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
-              step="0.01"
-              min="0"
-            />
+            >
+              <option value="circular">Circular</option>
+              <option value="rectangular">Rectangular</option>
+              <option value="annular">Annular</option>
+            </select>
           </div>
+
+          {(formData.shape || 'circular') === 'circular' && (
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                Diameter D (m):
+              </label>
+              <input
+                type="number"
+                name="D"
+                value={formData.D || 0.1}
+                onChange={handleInputChange}
+                style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+                step="0.01"
+                min="0"
+              />
+            </div>
+          )}
+
+          {formData.shape === 'rectangular' && (
+            <>
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                  Side a (m):
+                </label>
+                <input
+                  type="number"
+                  name="rect_a"
+                  value={formData.rect_a || 0.1}
+                  onChange={handleInputChange}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+                  step="0.01"
+                  min="0"
+                />
+              </div>
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                  Side b (m):
+                </label>
+                <input
+                  type="number"
+                  name="rect_b"
+                  value={formData.rect_b || 0.1}
+                  onChange={handleInputChange}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+                  step="0.01"
+                  min="0"
+                />
+              </div>
+            </>
+          )}
+
+          {formData.shape === 'annular' && (
+            <>
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                  Outer Diameter D_outer (m):
+                </label>
+                <input
+                  type="number"
+                  name="D_outer"
+                  value={formData.D_outer || 0.15}
+                  onChange={handleInputChange}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+                  step="0.01"
+                  min="0"
+                />
+              </div>
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                  Inner Diameter D_inner (m):
+                </label>
+                <input
+                  type="number"
+                  name="D_inner"
+                  value={formData.D_inner || 0.1}
+                  onChange={handleInputChange}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+                  step="0.01"
+                  min="0"
+                />
+              </div>
+            </>
+          )}
+
           <div style={{ marginBottom: '15px' }}>
             <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
               Length L (m):
@@ -568,10 +671,28 @@ function App() {
             borderRadius: '4px',
             cursor: 'pointer',
             fontWeight: 'bold',
-            fontSize: '12px'
+            fontSize: '12px',
+            marginBottom: '8px'
           }}
         >
           Load Diagram
+        </button>
+
+        <button
+          onClick={openGlobalSettingsModal}
+          style={{
+            width: '100%',
+            padding: '10px',
+            background: '#fff',
+            color: '#000',
+            border: '1px solid #000',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            fontSize: '12px'
+          }}
+        >
+          ⚙️ Settings
         </button>
       </div>
 
@@ -659,6 +780,97 @@ function App() {
               </button>
               <button
                 onClick={handleClose}
+                style={{
+                  padding: '10px 20px',
+                  background: '#f44336',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '14px'
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Global Settings Modal */}
+      {isGlobalModalOpen && (
+        <>
+          {/* Modal backdrop */}
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              background: 'rgba(0,0,0,0.5)',
+              zIndex: 999,
+            }}
+            onClick={closeGlobalSettingsModal}
+          />
+
+          {/* Modal content */}
+          <div
+            style={{
+              position: 'fixed',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              background: '#fff',
+              padding: '20px',
+              border: '1px solid #ccc',
+              borderRadius: '8px',
+              boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+              zIndex: 1000,
+              minWidth: '350px',
+            }}
+          >
+            <h3 style={{ marginTop: 0, marginBottom: '20px' }}>
+              Global Fluid Settings
+            </h3>
+
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                Default Fluid Type:
+              </label>
+              <select
+                value={globalFluid}
+                onChange={(e) => setGlobalFluid(e.target.value)}
+                style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+              >
+                {fluidTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+              </select>
+            </div>
+
+            <p style={{ fontSize: '12px', color: '#666', marginBottom: '15px' }}>
+              This fluid type will be automatically assigned to new tanks.
+              Individual tanks can still be customized after creation.
+            </p>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+              <button
+                onClick={closeGlobalSettingsModal}
+                style={{
+                  padding: '10px 20px',
+                  background: '#4CAF50',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '14px'
+                }}
+              >
+                Save
+              </button>
+              <button
+                onClick={closeGlobalSettingsModal}
                 style={{
                   padding: '10px 20px',
                   background: '#f44336',
