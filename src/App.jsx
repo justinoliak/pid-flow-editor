@@ -212,6 +212,31 @@ function App() {
     closeFittingsModal();
   };
 
+  // Handle Solve button - serialize graph for solver
+  const handleSolve = () => {
+    const graph = {
+      nodes: nodes.map(node => ({
+        id: node.id,
+        type: node.type,
+        data: node.data,
+        position: node.position,
+      })),
+      edges: edges.map(edge => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        data: edge.data,
+      })),
+      defaultPipeProps,
+      globalFluid,
+      timestamp: new Date().toISOString()
+    };
+    console.log('Serialized Graph for Solver:', JSON.stringify(graph, null, 2));
+
+    // TODO: Call solver function here when implemented
+    alert(`Graph serialized! Found ${nodes.length} nodes and ${edges.length} edges. Check console for details.`);
+  };
+
   // Handle form input changes
   const handleInputChange = (e) => {
     const { name, value, type: inputType, checked } = e.target;
@@ -737,6 +762,24 @@ function App() {
           }}
         >
           Minor Losses/Fittings
+        </button>
+
+        <button
+          onClick={handleSolve}
+          style={{
+            width: '100%',
+            padding: '12px',
+            background: '#28a745',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            fontSize: '14px',
+            marginBottom: '10px'
+          }}
+        >
+          🔬 Solve System
         </button>
 
         <hr style={{ margin: '15px 0', border: 'none', borderTop: '1px solid #ddd' }} />
