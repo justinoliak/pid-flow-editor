@@ -27,6 +27,36 @@ const nodeTypes = {
 const fluidTypes = ['water_20C', 'water_100F', 'water_60F', 'water_10C', 'air_20C', 'air_80C', 'toluene_114C'];
 const valveKTypes = ['elbow_90_flanged', 'elbow_90_threaded', 'valve_globe_open', 'valve_gate_open', 'entrance_square', 'exit'];
 
+// Sorted fitting types for minor losses
+const fittingTypes = [
+  'elbow_45_flanged',
+  'elbow_45_threaded',
+  'elbow_90_flanged',
+  'elbow_90_long_radius_flanged',
+  'elbow_90_long_radius_threaded',
+  'elbow_90_threaded',
+  'entrance_reentrant',
+  'entrance_rounded',
+  'entrance_square',
+  'exit',
+  'return_bend_180_flanged',
+  'return_bend_180_threaded',
+  'tee_branch_flow_flanged',
+  'tee_branch_flow_threaded',
+  'tee_line_flow_flanged',
+  'tee_line_flow_threaded',
+  'union_threaded',
+  'valve_angle_open',
+  'valve_ball_open',
+  'valve_check_swing',
+  'valve_gate_1/4_closed',
+  'valve_gate_1/2_closed',
+  'valve_gate_3/4_closed',
+  'valve_gate_open',
+  'valve_globe_half_open',
+  'valve_globe_open'
+];
+
 // Custom edge types for pipe-like connections
 const edgeTypes = {
   pipe: (props) => (
@@ -71,7 +101,13 @@ function App() {
 
   // Global fluid settings
   const [globalFluid, setGlobalFluid] = useState('water_20C');
-  const [isGlobalModalOpen, setIsGlobalModalOpen] = useState(false);
+
+  // Fittings modal state
+  const [isFittingsModalOpen, setIsFittingsModalOpen] = useState(false);
+  const [selectedEdgeId, setSelectedEdgeId] = useState(null);
+  const [fittingsFormData, setFittingsFormData] = useState({ fittings: [], K_total: '' });
+  const [tempFittingName, setTempFittingName] = useState('');
+  const [tempFittingQty, setTempFittingQty] = useState('');
 
   const onConnect = useCallback(
     (params) => {
@@ -115,6 +151,7 @@ function App() {
 
   // Open modal on edge click
   const onEdgeClick = useCallback((event, edge) => {
+    setSelectedEdgeId(edge.id);
     setCurrentItem({ ...edge, isNode: false });
     setFormData(edge.data || defaultPipeProps);
     setIsModalOpen(true);
@@ -123,31 +160,56 @@ function App() {
   // Open global pipe defaults modal
   const openDefaultsModal = () => {
     setCurrentItem({ type: 'defaults' });
-    setFormData({ ...defaultPipeProps, applyToAll: false });
+    setFormData({ ...defaultPipeProps, globalFluid });
     setIsModalOpen(true);
   };
 
-  // Open global settings modal
-  const openGlobalSettingsModal = () => {
-    setIsGlobalModalOpen(true);
+
+  // Open fittings modal
+  const openFittingsModal = () => {
+    // Reset form data when opening
+    setFittingsFormData({ fittings: [], K_total: '' });
+    setIsFittingsModalOpen(true);
   };
 
-  // Save global settings and update existing tanks
-  const saveGlobalSettings = () => {
-    // Update all existing tank nodes with the new fluid type
-    setNodes((nds) =>
-      nds.map((node) =>
-        node.type === 'tank'
-          ? { ...node, data: { ...node.data, fluidType: globalFluid } }
-          : node
-      )
-    );
-    setIsGlobalModalOpen(false);
+  // Close fittings modal
+  const closeFittingsModal = () => {
+    setIsFittingsModalOpen(false);
+    setTempFittingName('');
+    setTempFittingQty('');
   };
 
-  // Close global settings modal without saving
-  const closeGlobalSettingsModal = () => {
-    setIsGlobalModalOpen(false);
+  // Add fitting to list
+  const addFitting = () => {
+    if (tempFittingName) {
+      const updatedFittings = [...fittingsFormData.fittings, {
+        name: tempFittingName,
+        qty: parseInt(tempFittingQty) || 1
+      }];
+      setFittingsFormData({ ...fittingsFormData, fittings: updatedFittings });
+      setTempFittingName('');
+      setTempFittingQty('');
+    }
+  };
+
+  // Remove fitting from list
+  const removeFitting = (index) => {
+    const updated = fittingsFormData.fittings.filter((_, i) => i !== index);
+    setFittingsFormData({ ...fittingsFormData, fittings: updated });
+  };
+
+  // Save fittings to selected edge
+  const saveFittings = () => {
+    if (selectedEdgeId) {
+      setEdges((eds) =>
+        eds.map((e) =>
+          e.id === selectedEdgeId
+            ? { ...e, data: { ...e.data, minorLosses: fittingsFormData } }
+            : e
+        )
+      );
+    }
+    closeFittingsModal();
   };
 
   // Handle form input changes
@@ -182,12 +244,23 @@ function App() {
       };
       setDefaultPipeProps(newDefaults);
 
-      // Optionally apply to all existing edges
-      if (formData.applyToAll) {
-        setEdges((eds) =>
-          eds.map((e) => ({ ...e, data: { ...e.data, ...newDefaults } }))
+      // Update global fluid type
+      if (formData.globalFluid) {
+        setGlobalFluid(formData.globalFluid);
+        // Update all existing tank nodes with the new fluid type
+        setNodes((nds) =>
+          nds.map((node) =>
+            node.type === 'tank'
+              ? { ...node, data: { ...node.data, fluidType: formData.globalFluid } }
+              : node
+          )
         );
       }
+
+      // Apply to all existing edges
+      setEdges((eds) =>
+        eds.map((e) => ({ ...e, data: { ...e.data, ...newDefaults } }))
+      );
     } else if (currentItem.isNode) {
       setNodes((nds) =>
         nds.map((n) =>
@@ -341,21 +414,21 @@ function App() {
               <option value="annular">Annular</option>
             </select>
           </div>
-          <div style={{ marginBottom: '15px', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#f9f9f9' }}>
-            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                name="applyToAll"
-                checked={formData.applyToAll || false}
-                onChange={handleInputChange}
-                style={{ marginRight: '8px' }}
-              />
-              Apply to All Existing Pipes
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+              Default Fluid Type:
             </label>
-            <p style={{ color: '#d32f2f', fontSize: '12px', margin: '5px 0 0 0' }}>
-              ⚠️ Warning: This will overwrite all pipe-specific settings!
-            </p>
+            <select
+              name="globalFluid"
+              value={formData.globalFluid || globalFluid}
+              onChange={handleInputChange}
+              style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+            >
+              {fluidTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+            </select>
+            <small style={{ color: '#666' }}>This fluid type will be applied to ALL existing tanks and automatically assigned to new tanks.</small>
           </div>
+
         </>
       );
     }
@@ -645,7 +718,25 @@ function App() {
             marginBottom: '10px'
           }}
         >
-          Set Pipe Defaults
+          System Settings
+        </button>
+
+        <button
+          onClick={openFittingsModal}
+          style={{
+            width: '100%',
+            padding: '10px',
+            background: '#ff6b35',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            fontSize: '12px',
+            marginBottom: '10px'
+          }}
+        >
+          Minor Losses/Fittings
         </button>
 
         <hr style={{ margin: '15px 0', border: 'none', borderTop: '1px solid #ddd' }} />
@@ -699,28 +790,10 @@ function App() {
             borderRadius: '4px',
             cursor: 'pointer',
             fontWeight: 'bold',
-            fontSize: '12px',
-            marginBottom: '8px'
-          }}
-        >
-          Load Diagram
-        </button>
-
-        <button
-          onClick={openGlobalSettingsModal}
-          style={{
-            width: '100%',
-            padding: '10px',
-            background: '#fff',
-            color: '#000',
-            border: '1px solid #000',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontWeight: 'bold',
             fontSize: '12px'
           }}
         >
-          ⚙️ Settings
+          Load Diagram
         </button>
       </div>
 
@@ -781,7 +854,7 @@ function App() {
           >
             <h3 style={{ marginTop: 0, marginBottom: '20px' }}>
               {currentItem?.type === 'defaults'
-                ? 'Set Global Pipe Defaults'
+                ? 'Global Pipe Defaults & Fluid Settings'
                 : currentItem?.isNode
                 ? `Edit ${currentItem.data?.label || currentItem.type} Properties`
                 : 'Edit Pipe Properties'
@@ -826,8 +899,9 @@ function App() {
         </>
       )}
 
-      {/* Global Settings Modal */}
-      {isGlobalModalOpen && (
+
+      {/* Minor Losses/Fittings Modal */}
+      {isFittingsModalOpen && (
         <>
           {/* Modal backdrop */}
           <div
@@ -840,7 +914,7 @@ function App() {
               background: 'rgba(0,0,0,0.5)',
               zIndex: 999,
             }}
-            onClick={closeGlobalSettingsModal}
+            onClick={closeFittingsModal}
           />
 
           {/* Modal content */}
@@ -856,49 +930,165 @@ function App() {
               borderRadius: '8px',
               boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
               zIndex: 1000,
-              minWidth: '350px',
+              minWidth: '450px',
+              maxHeight: '80vh',
+              overflowY: 'auto',
             }}
           >
             <h3 style={{ marginTop: 0, marginBottom: '20px' }}>
-              Global Fluid Settings
+              Minor Losses/Fittings Configuration
             </h3>
 
-            <div style={{ marginBottom: '15px' }}>
+            {/* Pipe selector */}
+            <div style={{ marginBottom: '20px' }}>
               <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                Default Fluid Type:
+                Select Pipe:
               </label>
               <select
-                value={globalFluid}
-                onChange={(e) => setGlobalFluid(e.target.value)}
+                value={selectedEdgeId || ''}
+                onChange={(e) => {
+                  const edgeId = e.target.value;
+                  setSelectedEdgeId(edgeId);
+                  if (edgeId) {
+                    const selectedEdge = edges.find((edge) => edge.id === edgeId);
+                    setFittingsFormData(selectedEdge?.data?.minorLosses ? {
+                      fittings: selectedEdge.data.minorLosses.fittings || [],
+                      K_total: selectedEdge.data.minorLosses.K_total || ''
+                    } : { fittings: [], K_total: '' });
+                  } else {
+                    setFittingsFormData({ fittings: [], K_total: '' });
+                  }
+                }}
                 style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
               >
-                {fluidTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+                <option value="">Choose a pipe...</option>
+                {edges.map((edge, index) => (
+                  <option key={edge.id} value={edge.id}>
+                    Pipe {index + 1} ({edge.source} → {edge.target})
+                  </option>
+                ))}
               </select>
+              {edges.length === 0 && (
+                <p style={{ color: '#666', fontStyle: 'italic', margin: '5px 0 0 0' }}>
+                  No pipes found. Please connect some components first.
+                </p>
+              )}
             </div>
 
-            <p style={{ fontSize: '12px', color: '#666', marginBottom: '15px' }}>
-              This fluid type will be applied to ALL existing tanks and automatically assigned to new tanks.
-              Individual tanks can still be customized after creation.
-            </p>
+            {/* Fitting selector */}
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                Select Fitting Type:
+              </label>
+              <select
+                value={tempFittingName}
+                onChange={(e) => setTempFittingName(e.target.value)}
+                style={{ width: '70%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px', marginRight: '10px' }}
+              >
+                <option value="">Choose fitting...</option>
+                {fittingTypes.map((name) => (
+                  <option key={name} value={name}>
+                    {name.replace(/_/g, ' ').replace(/(\d\/\d)/g, '$1 ')}
+                  </option>
+                ))}
+              </select>
 
+              <input
+                type="number"
+                placeholder="Qty"
+                min="1"
+                value={tempFittingQty}
+                onChange={(e) => setTempFittingQty(e.target.value)}
+                style={{ width: '15%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px', marginRight: '5px' }}
+              />
+
+              <button
+                onClick={addFitting}
+                disabled={!tempFittingName}
+                style={{
+                  padding: '8px 12px',
+                  background: tempFittingName ? '#28a745' : '#ccc',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: tempFittingName ? 'pointer' : 'not-allowed',
+                  fontSize: '12px'
+                }}
+              >
+                Add
+              </button>
+            </div>
+
+            {/* Added fittings list */}
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                Added Fittings:
+              </label>
+              {fittingsFormData.fittings.length === 0 ? (
+                <p style={{ color: '#666', fontStyle: 'italic', margin: '0' }}>No fittings added yet</p>
+              ) : (
+                <ul style={{ margin: '0', padding: '0', listStyle: 'none', border: '1px solid #ddd', borderRadius: '4px', maxHeight: '150px', overflowY: 'auto' }}>
+                  {fittingsFormData.fittings.map((fit, idx) => (
+                    <li key={idx} style={{ padding: '8px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>
+                        <strong>{fit.qty}</strong> x {fit.name.replace(/_/g, ' ').replace(/(\d\/\d)/g, '$1 ')}
+                      </span>
+                      <button
+                        onClick={() => removeFitting(idx)}
+                        style={{
+                          padding: '4px 8px',
+                          background: '#dc3545',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '3px',
+                          cursor: 'pointer',
+                          fontSize: '11px'
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* Manual K_total override */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                Manual K_total Override:
+              </label>
+              <input
+                type="number"
+                placeholder="Leave empty to auto-calculate from fittings"
+                step="0.01"
+                value={fittingsFormData.K_total}
+                onChange={(e) => setFittingsFormData({ ...fittingsFormData, K_total: e.target.value })}
+                style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+              />
+              <small style={{ color: '#666' }}>If specified, this will override the calculated total from individual fittings</small>
+            </div>
+
+            {/* Save and Cancel buttons */}
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
               <button
-                onClick={saveGlobalSettings}
+                onClick={saveFittings}
+                disabled={!selectedEdgeId}
                 style={{
                   padding: '10px 20px',
-                  background: '#4CAF50',
+                  background: selectedEdgeId ? '#4CAF50' : '#ccc',
                   color: '#fff',
                   border: 'none',
                   borderRadius: '4px',
-                  cursor: 'pointer',
+                  cursor: selectedEdgeId ? 'pointer' : 'not-allowed',
                   fontWeight: 'bold',
                   fontSize: '14px'
                 }}
               >
-                Save
+                Save Fittings
               </button>
               <button
-                onClick={closeGlobalSettingsModal}
+                onClick={closeFittingsModal}
                 style={{
                   padding: '10px 20px',
                   background: '#f44336',
