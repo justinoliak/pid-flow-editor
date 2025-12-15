@@ -26,14 +26,26 @@ const nodeTypes = {
 // Custom edge types for pipe-like connections
 const edgeTypes = {
   pipe: (props) => (
-    <SmoothStepEdge
-      {...props}
-      style={{
-        stroke: 'blue',
-        strokeWidth: 4,
-        strokeDasharray: '5,5', // Optional dashed line (can be used for flow animation later)
-      }}
-    />
+    <g>
+      {/* Black border/outline */}
+      <SmoothStepEdge
+        {...props}
+        style={{
+          stroke: '#000',
+          strokeWidth: 8,
+          strokeDasharray: '5,5',
+        }}
+      />
+      {/* Blue pipe interior */}
+      <SmoothStepEdge
+        {...props}
+        style={{
+          stroke: '#4A90E2',
+          strokeWidth: 6,
+          strokeDasharray: '5,5',
+        }}
+      />
+    </g>
   ),
 };
 
