@@ -16,6 +16,9 @@ import TankNode from './components/TankNode';
 import PumpNode from './components/PumpNode';
 import ValveNode from './components/ValveNode';
 
+// Mock solver
+import { mockSolver } from './utils/mockSolver';
+
 // Map node types
 const nodeTypes = {
   tank: TankNode,
@@ -107,6 +110,9 @@ function App() {
     type: 'unknown', // 'volumetric', 'mass', or 'unknown'
     value: 0.01,     // m³/s or kg/s (when not unknown)
   });
+
+  // Solver results state
+  const [solverResults, setSolverResults] = useState(null);
 
   // Fittings modal state
   const [isFittingsModalOpen, setIsFittingsModalOpen] = useState(false);
@@ -218,7 +224,7 @@ function App() {
     closeFittingsModal();
   };
 
-  // Handle Solve button - serialize graph for solver
+  // Handle Solve button - serialize graph and run mock solver
   const handleSolve = () => {
     const graph = {
       nodes: nodes.map(node => ({
@@ -240,8 +246,23 @@ function App() {
     };
     console.log('Serialized Graph for Solver:', JSON.stringify(graph, null, 2));
 
-    // TODO: Call solver function here when implemented
-    alert(`Graph serialized! Found ${nodes.length} nodes and ${edges.length} edges. Check console for details.`);
+    // Run mock solver
+    try {
+      const results = mockSolver(graph);
+      setSolverResults(results);
+      console.log('Mock Solver Results:', results);
+
+      alert(`Solver completed successfully!\n` +
+            `Flow Rate: ${results.Q.toFixed(4)} m³/s (${results.Q_mass.toFixed(2)} kg/s)\n` +
+            `Average Velocity: ${results.v_avg.toFixed(2)} m/s\n` +
+            `System Head: ${results.h_a.toFixed(1)} m\n` +
+            `Total Head Loss: ${results.h_L_total.toFixed(2)} m\n` +
+            `Warnings: ${results.warnings.length}\n` +
+            `Check console for detailed results.`);
+    } catch (error) {
+      console.error('Solver error:', error);
+      alert('Error running solver: ' + error.message);
+    }
   };
 
   // Handle form input changes
@@ -876,6 +897,35 @@ function App() {
         >
           Solve System
         </button>
+
+        {/* Solver Results Display */}
+        {solverResults && (
+          <div style={{
+            background: '#e8f5e8',
+            border: '1px solid #4caf50',
+            borderRadius: '4px',
+            padding: '10px',
+            marginBottom: '10px',
+            fontSize: '10px',
+            fontFamily: 'monospace'
+          }}>
+            <h4 style={{ margin: '0 0 8px 0', color: '#2e7d32', fontSize: '12px' }}>
+              Solver Results
+            </h4>
+            <div style={{ color: '#1b5e20' }}>
+              <div>Q: {solverResults.Q.toFixed(4)} m³/s</div>
+              <div>v: {solverResults.v_avg.toFixed(2)} m/s</div>
+              <div>H: {solverResults.h_a.toFixed(1)} m</div>
+              <div>ΔP: {(solverResults.deltaP/1000).toFixed(1)} kPa</div>
+              <div>Re: {solverResults.Re.toFixed(0)} ({solverResults.flowRegime})</div>
+              {solverResults.warnings.length > 0 && (
+                <div style={{ color: '#d32f2f', marginTop: '5px' }}>
+                  ⚠ {solverResults.warnings.length} warning(s)
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         <hr style={{ margin: '15px 0', border: 'none', borderTop: '1px solid #ddd' }} />
 
