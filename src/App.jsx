@@ -33,7 +33,6 @@ const edgeTypes = {
         style={{
           stroke: '#000',
           strokeWidth: 8,
-          strokeDasharray: '5,5',
         }}
       />
       {/* Blue pipe interior */}
@@ -42,7 +41,6 @@ const edgeTypes = {
         style={{
           stroke: '#4A90E2',
           strokeWidth: 6,
-          strokeDasharray: '5,5',
         }}
       />
     </g>

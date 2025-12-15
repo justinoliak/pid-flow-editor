@@ -9,7 +9,7 @@ export default function TankNode({ data }) {
         position={Position.Left}
         id="inlet"
         style={{
-          top: '70%',
+          top: '50%',
           left: '-2px',
           width: '8px',
           height: '8px',
@@ -166,7 +166,7 @@ export default function TankNode({ data }) {
         position={Position.Right}
         id="outlet"
         style={{
-          top: '70%',
+          top: '50%',
           right: '-2px',
           width: '8px',
           height: '8px',
