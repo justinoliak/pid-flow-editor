@@ -1,0 +1,232 @@
+/* Global styles */
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Main app layout */
+.app {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 250px;
+  background: #f5f5f5;
+  border-right: 2px solid #ddd;
+  padding: 20px;
+  overflow-y: auto;
+  box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+}
+
+.sidebar h2 {
+  margin: 0 0 20px 0;
+  color: #333;
+  font-size: 18px;
+  border-bottom: 2px solid #4477ff;
+  padding-bottom: 8px;
+}
+
+/* Component palette */
+.component-palette {
+  margin-bottom: 30px;
+}
+
+.draggable-component {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  margin: 8px 0;
+  background: white;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  cursor: grab;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.draggable-component:hover {
+  background: #f0f8ff;
+  border-color: #4477ff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.draggable-component:active {
+  cursor: grabbing;
+  transform: scale(0.98);
+}
+
+.draggable-component span {
+  font-weight: 500;
+  color: #333;
+}
+
+/* Solver controls */
+.controls {
+  border-top: 2px solid #ddd;
+  padding-top: 20px;
+}
+
+.controls h3 {
+  margin: 0 0 15px 0;
+  color: #333;
+  font-size: 16px;
+}
+
+.solve-button {
+  width: 100%;
+  padding: 12px;
+  background: #4477ff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.3s ease;
+  margin-bottom: 15px;
+}
+
+.solve-button:hover:not(:disabled) {
+  background: #3366ee;
+}
+
+.solve-button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.results {
+  background: #e8f5e8;
+  border: 1px solid #4caf50;
+  border-radius: 6px;
+  padding: 12px;
+  font-size: 12px;
+}
+
+.results h4 {
+  margin: 0 0 8px 0;
+  color: #2e7d32;
+  font-size: 14px;
+}
+
+.results p {
+  margin: 4px 0;
+  color: #1b5e20;
+  font-family: monospace;
+}
+
+/* Canvas area */
+.flow-canvas {
+  flex: 1;
+  position: relative;
+}
+
+/* Custom node styles */
+.tank-node, .pump-node, .valve-node {
+  background: white;
+  border: 2px solid #333;
+  border-radius: 8px;
+  padding: 8px;
+  min-width: 80px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.node-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.node-data {
+  font-size: 10px;
+  color: #666;
+  margin-top: 4px;
+  font-family: monospace;
+}
+
+/* Pump rotation animation */
+@keyframes pump-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.pump-rotating {
+  animation: pump-rotate 1s linear infinite;
+  transform-origin: center;
+}
+
+/* Pipe flow animation */
+@keyframes pipe-flow {
+  0% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -30; }
+}
+
+/* Enhanced pipe styling */
+.react-flow__edge {
+  z-index: 1;
+}
+
+.react-flow__edge:hover {
+  filter: drop-shadow(0 0 8px rgba(74, 144, 226, 0.8));
+  transition: all 0.3s ease;
+}
+
+.react-flow__edge path {
+  transition: all 0.3s ease;
+}
+
+/* Pipe labels */
+.react-flow__edge-text {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* React Flow customizations */
+.react-flow__node {
+  font-family: inherit;
+}
+
+.react-flow__handle {
+  width: 8px;
+  height: 8px;
+  background: #4477ff;
+  border: 2px solid white;
+}
+
+.react-flow__handle:hover {
+  background: #3366ee;
+}
+
+/* Minimap styling */
+.react-flow__minimap {
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+}
+
+/* Controls styling */
+.react-flow__controls {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.react-flow__controls-button {
+  background: white;
+  border-bottom: 1px solid #ddd;
+  color: #333;
+}
+
+.react-flow__controls-button:hover {
+  background: #f0f0f0;
+}
