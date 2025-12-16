@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import ReactFlow, {
   useNodesState,
   useEdgesState,
@@ -7,6 +7,7 @@ import ReactFlow, {
   Controls,
   MiniMap,
 } from 'reactflow';
+import Modal from 'react-modal';
 import 'reactflow/dist/style.css'; // Required CSS
 import './App.css';
 
@@ -16,8 +17,6 @@ import PumpNode from './components/PumpNode';
 import ValveNode from './components/ValveNode';
 import CustomPipeEdge from './components/CustomPipeEdge';
 
-// Mock solver
-import { mockSolver } from './utils/mockSolver';
 
 // Map node types
 const nodeTypes = {
@@ -84,6 +83,11 @@ function App() {
   const [currentItem, setCurrentItem] = useState(null); // Node, Edge, or 'defaults' being edited
   const [formData, setFormData] = useState({}); // Temp state for editing
 
+  // Mode selection and extras handling
+  const [selectedMode, setSelectedMode] = useState('auto');
+  const [showExtrasModal, setShowExtrasModal] = useState(false);
+  const [extras, setExtras] = useState({ Q: 0.01, h_a: 25, W_shaft: 1000 });
+
   // Global pipe defaults
   const [defaultPipeProps, setDefaultPipeProps] = useState({
     D: 0.1,           // m - diameter
@@ -104,6 +108,8 @@ function App() {
 
   // Solver results state
   const [solverResults, setSolverResults] = useState(null);
+  const [isSolving, setIsSolving] = useState(false);
+  const [warnings, setWarnings] = useState([]);
 
   // Fittings modal state
   const [isFittingsModalOpen, setIsFittingsModalOpen] = useState(false);
@@ -111,6 +117,11 @@ function App() {
   const [fittingsFormData, setFittingsFormData] = useState({ fittings: [], K_total: '' });
   const [tempFittingName, setTempFittingName] = useState('');
   const [tempFittingQty, setTempFittingQty] = useState('');
+
+  // Set app element for modal
+  useEffect(() => {
+    Modal.setAppElement('#root');
+  }, []);
 
   const onConnect = useCallback(
     (params) => {
@@ -224,87 +235,143 @@ function App() {
     closeFittingsModal();
   };
 
-  // Handle Solve button - serialize graph and run mock solver
-  const handleSolve = () => {
-    const graph = {
-      nodes: nodes.map(node => ({
-        id: node.id,
-        type: node.type,
-        data: node.data,
-        position: node.position,
-      })),
-      edges: edges.map(edge => ({
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        data: edge.data,
-      })),
-      defaultPipeProps,
-      globalFluid,
-      flowRateSettings,
-      timestamp: new Date().toISOString()
-    };
-    console.log('Serialized Graph for Solver:', JSON.stringify(graph, null, 2));
+  // Handle Solve button - serialize graph and run solver
+  const handleSolve = async () => {
+    setIsSolving(true);
+    setWarnings([]);  // Clear previous warnings
 
-    // Run mock solver
     try {
-      const results = mockSolver(graph);
-      setSolverResults(results);
-      console.log('Mock Solver Results:', results);
+      // Prepare graph data for API
+      const graph = {
+        nodes: nodes.map(node => ({
+          id: node.id,
+          type: node.type,
+          data: node.data,
+        })),
+        edges: edges.map(edge => ({
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          data: edge.data,
+        })),
+      };
 
-      // Apply flow animation to edges based on solver results
-      if (results.Q > 0) {
-        setEdges((eds) =>
-          eds.map((edge) => {
-            // Calculate animation duration based on velocity (faster flow = faster animation)
-            const velocity = results.v_avg || 1;
-            const animationDuration = Math.max(0.1, 0.8 / velocity); // Min 0.1s, much faster animation
+      // Auto-detect solver mode based on system components
+      let effectiveMode = selectedMode;
+      if (effectiveMode === 'auto') {
+        const hasPump = nodes.some(node => node.type === 'pump');
+        const hasPumpWithCurve = nodes.some(node => node.type === 'pump' && node.data?.pump_curve);
 
-            return {
+        if (hasPumpWithCurve) {
+          effectiveMode = 'operating_point';
+        } else if (hasPump) {
+          effectiveMode = 'given_pump_head';
+        } else {
+          effectiveMode = 'gravity';
+        }
+      }
+
+      // Check if mode needs extras - open modal if yes
+      const modesNeedingExtras = ['inverse_diameter', 'inverse_length', 'given_Q_and_power'];
+      if (modesNeedingExtras.includes(effectiveMode)) {
+        setShowExtrasModal(true);
+        setIsSolving(false); // Stop solving, wait for modal
+        return;
+      }
+
+      console.log('Sending graph to API:', { graph, mode: effectiveMode });
+
+      // Call FastAPI backend
+      const response = await fetch('http://localhost:8000/solve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ graph, mode: effectiveMode })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+
+      const apiResult = await response.json();
+      console.log('API Response:', apiResult);
+
+      if (apiResult.status === 'success') {
+        const results = apiResult.data;
+        setSolverResults(results);
+
+        // Apply flow animation to edges based on solver results
+        const flowRate = results.raw_results?.flow_rate || 0;
+        const velocity = results.raw_results?.velocity || 0;
+
+        if (flowRate > 0) {
+          setEdges((eds) =>
+            eds.map((edge) => {
+              // Calculate animation duration based on velocity (faster flow = faster animation)
+              const animationDuration = Math.max(0.1, 0.8 / velocity); // Min 0.1s, faster animation
+
+              return {
+                ...edge,
+                type: 'pipe',
+                animated: true,
+                style: {
+                  ...edge.style,
+                  strokeDasharray: '10,5', // Dashed for inner flow
+                  animation: `pipe-flow ${animationDuration}s linear infinite`,
+                },
+                data: {
+                  ...edge.data,
+                },
+              };
+            })
+          );
+        } else {
+          // No flow: Remove dashes and animation
+          setEdges((eds) =>
+            eds.map((edge) => ({
               ...edge,
               type: 'pipe',
-              animated: true,
+              animated: false,
               style: {
                 ...edge.style,
-                strokeDasharray: '10,5', // Dashed for inner flow
-                animation: `pipe-flow ${animationDuration}s linear infinite`, // Applied to inner path
+                strokeDasharray: 'none',
+                animation: 'none',
               },
               data: {
                 ...edge.data,
               },
-            };
-          })
-        );
+            }))
+          );
+        }
+
+        // Show success message
+        alert(`Solver completed successfully!\n` +
+              `Mode: ${results.mode}\n` +
+              `Flow Rate: ${flowRate.toFixed(4)} m³/s\n` +
+              `Velocity: ${velocity.toFixed(2)} m/s\n` +
+              `Converged: ${results.converged ? 'Yes' : 'No'}\n` +
+              `Iterations: ${results.iterations}\n` +
+              `Check console for detailed results.`);
+
+      } else if (apiResult.status === 'missing_inputs') {
+        // Handle missing inputs from server
+        const missingInputs = apiResult.data?.missing_inputs || ['Unknown missing inputs'];
+        setWarnings(missingInputs.map(input => `Missing: ${input}`));
+        alert('Solver failed: Missing required inputs.\n\n' +
+              'Missing:\n' + missingInputs.join('\n') +
+              '\n\nPlease check the warnings panel and edit component properties.');
       } else {
-        // No flow: Remove dashes and animation
-        setEdges((eds) =>
-          eds.map((edge) => ({
-            ...edge,
-            type: 'pipe',
-            animated: false,
-            style: {
-              ...edge.style,
-              strokeDasharray: 'none',
-              animation: 'none',
-            },
-            data: {
-              ...edge.data,
-            },
-          }))
-        );
+        setWarnings([apiResult.message || 'Unknown solver error']);
+        alert('Solver failed: ' + (apiResult.message || 'Unknown error'));
       }
 
-      alert(`Solver completed successfully!\n` +
-            `Flow Rate: ${results.Q.toFixed(4)} m³/s (${results.Q_mass.toFixed(2)} kg/s)\n` +
-            `Average Velocity: ${results.v_avg.toFixed(2)} m/s\n` +
-            `System Head: ${results.h_a.toFixed(1)} m\n` +
-            `Total Head Loss: ${results.h_L_total.toFixed(2)} m\n` +
-            `Warnings: ${results.warnings.length}\n` +
-            `Check console for detailed results.`);
     } catch (error) {
-      console.error('Solver error:', error);
-      alert('Error running solver: ' + error.message);
+      console.error('API Error:', error);
+      const errorMessage = error.message || 'Failed to connect to solver API';
+      setWarnings([errorMessage]);
+      alert('Error calling solver: ' + errorMessage);
     }
+
+    setIsSolving(false);
   };
 
   // Handle form input changes
@@ -886,6 +953,36 @@ function App() {
 
         <hr style={{ margin: '15px 0', border: 'none', borderTop: '1px solid #ddd' }} />
 
+        {/* Mode Selection */}
+        <div style={{ marginBottom: '15px' }}>
+          <h3 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#333' }}>Solver Mode</h3>
+          <select
+            value={selectedMode}
+            onChange={(e) => setSelectedMode(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '8px',
+              border: '1px solid #ccc',
+              borderRadius: '4px',
+              fontSize: '12px',
+              background: 'white'
+            }}
+          >
+            <option value="auto">Auto-Detect</option>
+            <option value="gravity">Gravity Flow</option>
+            <option value="system_curve">System Curve</option>
+            <option value="given_pump_head">Fixed Pump Head</option>
+            <option value="given_pump_power">Fixed Pump Power</option>
+            <option value="given_Q_and_power">Fixed Q and Power</option>
+            <option value="operating_point">Operating Point</option>
+            <option value="inverse_diameter">Inverse Diameter</option>
+            <option value="inverse_length">Inverse Length</option>
+          </select>
+          <small style={{ color: '#666', fontSize: '10px', display: 'block', marginTop: '4px' }}>
+            Auto-detect analyzes your diagram components
+          </small>
+        </div>
+
         <button
           onClick={openDefaultsModal}
           style={{
@@ -924,21 +1021,41 @@ function App() {
 
         <button
           onClick={handleSolve}
+          disabled={isSolving}
           style={{
             width: '100%',
             padding: '10px',
-            background: '#007bff',
+            background: isSolving ? '#ccc' : '#007bff',
             color: 'white',
             border: 'none',
             borderRadius: '4px',
-            cursor: 'pointer',
+            cursor: isSolving ? 'not-allowed' : 'pointer',
             fontWeight: 'bold',
             fontSize: '12px',
             marginBottom: '10px'
           }}
         >
-          Solve System
+          {isSolving ? 'Solving...' : 'Solve System'}
         </button>
+
+        {/* Warnings Display */}
+        {warnings.length > 0 && (
+          <div style={{
+            background: '#fff3cd',
+            border: '1px solid #ffeaa7',
+            borderRadius: '4px',
+            padding: '10px',
+            marginBottom: '10px',
+            fontSize: '11px'
+          }}>
+            <strong>Warnings:</strong>
+            {warnings.map((warning, index) => (
+              <div key={index} style={{ marginTop: '4px' }}>
+                • {warning}
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Solver Results Display */}
         {solverResults && (
@@ -1336,6 +1453,185 @@ function App() {
           </div>
         </>
       )}
+
+      {/* Extras Modal for modes requiring additional inputs */}
+      <Modal
+        isOpen={showExtrasModal}
+        onRequestClose={() => setShowExtrasModal(false)}
+        style={{
+          content: {
+            width: '400px',
+            height: 'fit-content',
+            margin: 'auto',
+            padding: '20px',
+            borderRadius: '8px',
+            boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+          },
+          overlay: {
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            zIndex: 1001,
+          }
+        }}
+      >
+        <h3 style={{ marginTop: 0, marginBottom: '20px' }}>
+          Additional Parameters for {selectedMode.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+        </h3>
+
+        {/* Conditional fields based on mode */}
+        {(selectedMode === 'inverse_diameter' || selectedMode === 'inverse_length') && (
+          <>
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                Target Flow Rate Q (m³/s):
+              </label>
+              <input
+                type="number"
+                step="0.001"
+                value={extras.Q}
+                onChange={(e) => setExtras({...extras, Q: parseFloat(e.target.value) || 0})}
+                style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+                placeholder="e.g., 0.01"
+              />
+            </div>
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                Target Pump Head h_a (m):
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                value={extras.h_a}
+                onChange={(e) => setExtras({...extras, h_a: parseFloat(e.target.value) || 0})}
+                style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+                placeholder="e.g., 25"
+              />
+            </div>
+          </>
+        )}
+
+        {selectedMode === 'given_Q_and_power' && (
+          <>
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                Flow Rate Q (m³/s):
+              </label>
+              <input
+                type="number"
+                step="0.001"
+                value={extras.Q}
+                onChange={(e) => setExtras({...extras, Q: parseFloat(e.target.value) || 0})}
+                style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+                placeholder="e.g., 0.01"
+              />
+            </div>
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                Shaft Power W_shaft (W):
+              </label>
+              <input
+                type="number"
+                step="10"
+                value={extras.W_shaft}
+                onChange={(e) => setExtras({...extras, W_shaft: parseFloat(e.target.value) || 0})}
+                style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+                placeholder="e.g., 1000"
+              />
+            </div>
+          </>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', marginTop: '20px' }}>
+          <button
+            onClick={async () => {
+              setShowExtrasModal(false);
+              setIsSolving(true);
+
+              try {
+                // Prepare graph data for API
+                const graph = {
+                  nodes: nodes.map(node => ({
+                    id: node.id,
+                    type: node.type,
+                    data: node.data,
+                  })),
+                  edges: edges.map(edge => ({
+                    id: edge.id,
+                    source: edge.source,
+                    target: edge.target,
+                    data: edge.data,
+                  })),
+                };
+
+                console.log('Sending graph to API:', { graph, mode: selectedMode, extras });
+
+                // Call FastAPI backend with extras
+                const response = await fetch('http://localhost:8000/solve', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ graph, mode: selectedMode, extras })
+                });
+
+                if (!response.ok) {
+                  throw new Error(`Server error: ${response.status}`);
+                }
+
+                const apiResult = await response.json();
+                console.log('API Response:', apiResult);
+
+                if (apiResult.status === 'success') {
+                  const results = apiResult.data;
+                  setSolverResults(results);
+                  alert(`Solver completed successfully!\nMode: ${results.mode}\nCheck console for detailed results.`);
+                } else if (apiResult.status === 'missing_inputs') {
+                  setWarnings(apiResult.missing_inputs || ['Unknown missing inputs']);
+                  alert('Solver failed: Missing required inputs. Check warnings panel.');
+                } else {
+                  setWarnings([apiResult.message || 'Unknown solver error']);
+                  alert('Solver failed: ' + (apiResult.message || 'Unknown error'));
+                }
+
+              } catch (error) {
+                console.error('API Error:', error);
+                const errorMessage = error.message || 'Failed to connect to solver API';
+                setWarnings([errorMessage]);
+                alert('Error calling solver: ' + errorMessage);
+              }
+
+              setIsSolving(false);
+            }}
+            style={{
+              padding: '10px 20px',
+              background: '#4CAF50',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: '14px'
+            }}
+          >
+            Submit and Solve
+          </button>
+          <button
+            onClick={() => {
+              setShowExtrasModal(false);
+              setIsSolving(false);
+            }}
+            style={{
+              padding: '10px 20px',
+              background: '#f44336',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: '14px'
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

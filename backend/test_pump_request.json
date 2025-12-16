@@ -1,0 +1,51 @@
+{
+  "graph": {
+    "nodes": [
+      {
+        "id": "tank1",
+        "type": "tank",
+        "data": {
+          "elevation": 10.0,
+          "pressure": 101325
+        }
+      },
+      {
+        "id": "pump1",
+        "type": "pump",
+        "data": {
+          "head": 25.0,
+          "efficiency": 0.8
+        }
+      },
+      {
+        "id": "tank2",
+        "type": "tank",
+        "data": {
+          "elevation": 5.0,
+          "pressure": 101325
+        }
+      }
+    ],
+    "edges": [
+      {
+        "source": "tank1",
+        "target": "pump1",
+        "data": {
+          "length": 50.0,
+          "diameter": 0.1,
+          "roughness": 0.00005
+        }
+      },
+      {
+        "source": "pump1",
+        "target": "tank2",
+        "data": {
+          "length": 50.0,
+          "diameter": 0.1,
+          "roughness": 0.00005
+        }
+      }
+    ]
+  },
+  "mode": "given_pump_head"
+}
