@@ -1072,15 +1072,13 @@ function App() {
               Solver Results
             </h4>
             <div style={{ color: '#1b5e20' }}>
-              <div>Q: {solverResults.Q.toFixed(4)} m³/s</div>
-              <div>v: {solverResults.v_avg.toFixed(2)} m/s</div>
-              <div>H: {solverResults.h_a.toFixed(1)} m</div>
-              <div>ΔP: {(solverResults.deltaP/1000).toFixed(1)} kPa</div>
-              <div>Re: {solverResults.Re.toFixed(0)} ({solverResults.flowRegime})</div>
-              {solverResults.warnings.length > 0 && (
-                <div style={{ color: '#d32f2f', marginTop: '5px' }}>
-                  ⚠ {solverResults.warnings.length} warning(s)
-                </div>
+              <div>Q: {(solverResults.raw_results?.flow_rate || 0).toFixed(4)} m³/s</div>
+              <div>v: {(solverResults.raw_results?.velocity || 0).toFixed(2)} m/s</div>
+              <div>Mode: {solverResults.mode || 'Unknown'}</div>
+              <div>Converged: {solverResults.converged ? 'Yes' : 'No'}</div>
+              {solverResults.iterations && <div>Iterations: {solverResults.iterations}</div>}
+              {solverResults.raw_results?.head_loss && (
+                <div>Head Loss: {solverResults.raw_results.head_loss.toFixed(2)} m</div>
               )}
             </div>
           </div>
