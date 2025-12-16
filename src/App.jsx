@@ -272,7 +272,6 @@ function App() {
               },
               data: {
                 ...edge.data,
-                label: `${results.Q.toFixed(3)} m³/s`,
               },
             };
           })
@@ -291,7 +290,6 @@ function App() {
             },
             data: {
               ...edge.data,
-              label: 'No Flow',
             },
           }))
         );
