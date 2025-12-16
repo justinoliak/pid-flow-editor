@@ -38,47 +38,69 @@ def solve_graph(graph_data: Dict, mode: str, extras: Optional[Dict] = None) -> D
     nodes = graph_data.get('nodes', [])
     edges = graph_data.get('edges', [])
 
+    print(f"DEBUG: Translating graph with {len(nodes)} nodes and {len(edges)} edges")
+    print(f"DEBUG: Nodes: {[{n['type']: n.get('data', {})} for n in nodes]}")
+    print(f"DEBUG: Edges: {[e.get('data', {}) for e in edges]}")
+
     if not edges:
         raise ValueError("No pipes found in the system")
 
-    # Extract pipe parameters from first edge (simplified for single pipe system)
+    # Extract pipe parameters (use correct property names from frontend)
     edge_data = edges[0].get('data', {})
-    length = float(edge_data.get('length', 10.0))  # m
-    diameter = float(edge_data.get('diameter', 0.1))  # m
-    roughness = float(edge_data.get('roughness', 0.00005))  # m (steel pipe)
+    length = float(edge_data.get('L', 100.0))  # m - correct property name
+    diameter = float(edge_data.get('D', 0.1))  # m - correct property name
+    roughness = float(edge_data.get('epsilon', 0.00015))  # m - correct property name
+    density = float(edge_data.get('rho', 1000.0))  # kg/m³ - from pipe or default water
 
-    # Get tank elevations if present
-    elevation_in = 10.0  # default
-    elevation_out = 5.0   # default
+    # Get tank parameters (use correct property names)
+    elevation_in = 0.0  # default
+    elevation_out = 0.0   # default
+    pressure_in = 101325.0  # default atmospheric
+    pressure_out = 101325.0  # default atmospheric
+
     tank_count = 0
     for node in nodes:
         if node['type'] == 'tank':
-            if tank_count == 0:
-                elevation_in = float(node.get('data', {}).get('elevation', 10.0))
-            else:
-                elevation_out = float(node.get('data', {}).get('elevation', 5.0))
+            node_data = node.get('data', {})
+            if tank_count == 0:  # First tank (inlet)
+                elevation_in = float(node_data.get('z', 0.0))  # Correct property name
+                pressure_in = float(node_data.get('P', 101325.0))  # Correct property name
+            else:  # Second tank (outlet)
+                elevation_out = float(node_data.get('z', 0.0))
+                pressure_out = float(node_data.get('P', 101325.0))
             tank_count += 1
 
-    # Create a PipeSystem object with proper parameters
-    system = solver.PipeSystem(
-        rho=1000.0,  # Water density kg/m³
-        mu=0.001,    # Water viscosity Pa·s
-        D=diameter,  # Pipe diameter
-        L=length,    # Pipe length
-        epsilon=roughness,  # Pipe roughness
-        z1=elevation_in,    # Inlet elevation
-        z2=elevation_out,   # Outlet elevation
-        P1=101325.0,        # Inlet pressure (atmospheric)
-        P2=101325.0,        # Outlet pressure (atmospheric)
-        K_total=0.5         # Minor losses
-    )
-
-    # Get pump parameters if present
+    # Get pump parameters if present (use correct property name)
     pump_head = 20.0  # default
+    has_pump = False
     for node in nodes:
         if node['type'] == 'pump':
-            pump_head = float(node.get('data', {}).get('head', 20.0))
+            pump_data = node.get('data', {})
+            pump_head = float(pump_data.get('h_a', 20.0))  # Correct property name
+            has_pump = True
             break
+
+    print(f"DEBUG: Extracted parameters:")
+    print(f"  Pipe: L={length}m, D={diameter}m, ε={roughness}m, ρ={density}kg/m³")
+    print(f"  Tanks: z1={elevation_in}m (P1={pressure_in}Pa), z2={elevation_out}m (P2={pressure_out}Pa)")
+    if has_pump:
+        print(f"  Pump: h_a={pump_head}m")
+    else:
+        print(f"  No pump in system")
+
+    # Create a PipeSystem object with extracted parameters
+    system = solver.PipeSystem(
+        rho=density,         # Fluid density from pipe properties
+        mu=0.001,           # Water viscosity Pa·s (TODO: extract from fluid type)
+        D=diameter,         # Pipe diameter from edge data
+        L=length,           # Pipe length from edge data
+        epsilon=roughness,  # Pipe roughness from edge data
+        z1=elevation_in,    # Inlet tank elevation
+        z2=elevation_out,   # Outlet tank elevation
+        P1=pressure_in,     # Inlet tank pressure
+        P2=pressure_out,    # Outlet tank pressure
+        K_total=0.5         # Minor losses (TODO: extract from fittings)
+    )
 
     # Handle modes requiring extras
     if mode in ['inverse_diameter', 'inverse_length', 'given_Q_and_power'] and not extras:
@@ -97,42 +119,58 @@ def solve_graph(graph_data: Dict, mode: str, extras: Optional[Dict] = None) -> D
             # Use gravity flow solver
             result = solver.solve_gravity_flow(system)
 
-        elif mode == 'given_pump_head' or mode == 'operating_point':
-            # Use pump head solver
+        elif mode == 'given_pump_head':
+            # Fixed pump head solver
             result = solver.solve_given_pump_head(system, pump_head)
 
+        elif mode == 'operating_point':
+            # Find intersection of pump curve and system curve
+            # TODO: Extract pump curve data from pump node
+            result = solver.solve_operating_point(system)
+
         elif mode == 'system_curve':
-            # Generate system curve
-            result = solver.solve_gravity_flow(system)  # Simplified for now
+            # Generate system curve (multiple flow points)
+            Q_min = extras.get('Q_min', 0.001) if extras else 0.001
+            Q_max = extras.get('Q_max', 0.05) if extras else 0.05
+            n_points = extras.get('n_points', 20) if extras else 20
+            # Create Q range array
+            import numpy as np
+            Q_range = np.linspace(Q_min, Q_max, n_points)
+            # Call actual system curve solver
+            result = solver.solve_system_curve(system, Q_range, n_points)
 
         elif mode == 'given_pump_power':
-            # Solve with pump power constraint
-            result = solver.solve_given_pump_head(system, pump_head)  # Simplified
+            # Extract power and efficiency from pump node or extras
+            W_shaft = extras.get('W_shaft', 1000.0) if extras else 1000.0  # Watts
+            efficiency = extras.get('efficiency', 0.8) if extras else 0.8
+            # Call actual pump power solver
+            result = solver.solve_given_pump_power(system, W_shaft, efficiency)
 
         elif mode == 'given_Q_and_power':
             # Extract extras
             target_Q = extras.get('Q', 0.01) if extras else 0.01
             W_shaft = extras.get('W_shaft', 1000) if extras else 1000
-            # For now, use simplified calculation
-            result = solver.solve_gravity_flow(system)
+            efficiency = extras.get('efficiency', 0.8) if extras else 0.8
+            # Call actual solver function
+            result = solver.solve_given_Q_and_power(system, target_Q, W_shaft, efficiency)
 
         elif mode == 'inverse_diameter':
             # Extract target values from extras
             target_Q = extras.get('Q', 0.01) if extras else 0.01
             target_h_a = extras.get('h_a', 25) if extras else 25
-            # For now, use simplified calculation
-            result = solver.solve_gravity_flow(system)
+            # Call actual inverse diameter solver
+            result = solver.solve_inverse_diameter(system, target_Q, target_h_a)
 
         elif mode == 'inverse_length':
             # Extract target values from extras
             target_Q = extras.get('Q', 0.01) if extras else 0.01
             target_h_a = extras.get('h_a', 25) if extras else 25
-            # For now, use simplified calculation
-            result = solver.solve_gravity_flow(system)
+            # Call actual inverse length solver
+            result = solver.solve_inverse_length(system, target_Q, target_h_a)
 
         else:
-            # Default to gravity flow for unknown modes
-            result = solver.solve_gravity_flow(system)
+            # Unknown mode - raise error instead of silent fallback
+            raise ValueError(f"Unknown solver mode: {mode}. Valid modes are: gravity, given_pump_head, operating_point, system_curve, given_pump_power, given_Q_and_power, inverse_diameter, inverse_length")
 
         # Extract results from SolverResult object
         if hasattr(result, 'status') and result.status.name != 'SUCCESS':
@@ -150,7 +188,12 @@ def solve_graph(graph_data: Dict, mode: str, extras: Optional[Dict] = None) -> D
 
         # Calculate head loss if flow exists
         if flow_rate > 0:
-            head_loss = solver.calculate_major_head_loss(flow_rate, diameter, length, roughness)
+            # calculate_major_head_loss(L, D, Q, rho, mu, epsilon, g)
+            head_loss_result = solver.calculate_major_head_loss(
+                L=length, D=diameter, Q=flow_rate,
+                rho=density, mu=0.001, epsilon=roughness
+            )
+            head_loss = head_loss_result.get('h_L', 0.0)
         else:
             head_loss = 0.0
 

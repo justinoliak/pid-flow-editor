@@ -25,6 +25,137 @@ const nodeTypes = {
   valve: ValveNode,
 };
 
+// Solver Mode Information
+const SOLVER_MODE_INFO = {
+  'auto': {
+    name: 'Auto-Detect',
+    description: 'Automatically selects the best mode based on your diagram components',
+    required: {
+      components: ['Any valid P&ID configuration'],
+      variables: ['Based on detected mode']
+    },
+    optional: [],
+    notes: 'Detects pumps, valves, and system configuration to choose optimal solver'
+  },
+  'gravity': {
+    name: 'Gravity Flow',
+    description: 'Calculates flow rate driven purely by elevation difference and pressure',
+    required: {
+      components: ['Two tanks at different elevations', 'Connecting pipe(s)'],
+      variables: [
+        'Tank 1: z1 (elevation), P1 (pressure)',
+        'Tank 2: z2 (elevation), P2 (pressure)',
+        'Pipe: D (diameter), L (length), ε (roughness)',
+        'Fluid: ρ (density), μ (viscosity)'
+      ]
+    },
+    optional: ['K_total (minor losses)', 'Fittings'],
+    notes: 'Solves for Q when no pump is present'
+  },
+  'system_curve': {
+    name: 'System Curve',
+    description: 'Generates the system resistance curve (Head vs Flow)',
+    required: {
+      components: ['Complete piping system'],
+      variables: [
+        'All pipe dimensions (D, L, ε)',
+        'Static head (z2 - z1)',
+        'Pressure difference (P2 - P1)',
+        'Fluid properties (ρ, μ)'
+      ]
+    },
+    optional: ['Flow rate range for curve generation'],
+    notes: 'Produces H vs Q curve for pump selection'
+  },
+  'given_pump_head': {
+    name: 'Fixed Pump Head',
+    description: 'Calculates flow rate when pump head is known',
+    required: {
+      components: ['Pump with specified head', 'Complete flow path'],
+      variables: [
+        'Pump: h_a (pump head in meters)',
+        'System geometry (all elevations)',
+        'All pipe properties',
+        'Boundary pressures (P1, P2)'
+      ]
+    },
+    optional: ['Pump efficiency', 'NPSH available'],
+    notes: 'Finds Q given a fixed pump head'
+  },
+  'given_pump_power': {
+    name: 'Fixed Pump Power',
+    description: 'Calculates flow when shaft power is constrained',
+    required: {
+      components: ['Pump with power specification'],
+      variables: [
+        'Pump: W_shaft (shaft power in Watts)',
+        'Pump efficiency η',
+        'System parameters (same as gravity flow)'
+      ]
+    },
+    optional: ['Motor specifications'],
+    notes: 'Determines achievable flow with power limit'
+  },
+  'given_Q_and_power': {
+    name: 'Fixed Q and Power',
+    description: 'Validates if specified flow is achievable with given power',
+    required: {
+      components: ['Pump system'],
+      variables: [
+        '🔸 Q (target flow rate) - REQUIRES MODAL INPUT',
+        '🔸 W_shaft (available power) - REQUIRES MODAL INPUT',
+        'All system parameters'
+      ]
+    },
+    optional: [],
+    notes: '⚠️ Opens modal for Q and W_shaft input'
+  },
+  'operating_point': {
+    name: 'Operating Point',
+    description: 'Finds intersection of pump curve and system curve',
+    required: {
+      components: ['Pump with performance curve'],
+      variables: [
+        'Pump curve data (H vs Q points)',
+        'Or curve coefficients (a, b, c for H = aQ² + bQ + c)',
+        'Complete system parameters'
+      ]
+    },
+    optional: ['Efficiency curve', 'NPSH curve'],
+    notes: 'Most realistic pump analysis mode'
+  },
+  'inverse_diameter': {
+    name: 'Inverse Diameter',
+    description: 'Calculates required pipe diameter for target flow',
+    required: {
+      components: ['Complete system layout'],
+      variables: [
+        '🔸 Q (target flow rate) - REQUIRES MODAL INPUT',
+        '🔸 h_a (available pump head) - REQUIRES MODAL INPUT',
+        'Pipe length L',
+        'All other system parameters'
+      ]
+    },
+    optional: ['Diameter constraints (min/max)'],
+    notes: '⚠️ Opens modal for target Q and h_a'
+  },
+  'inverse_length': {
+    name: 'Inverse Length',
+    description: 'Calculates maximum pipe length for target flow',
+    required: {
+      components: ['System with unknown pipe length'],
+      variables: [
+        '🔸 Q (target flow rate) - REQUIRES MODAL INPUT',
+        '🔸 h_a (available pump head) - REQUIRES MODAL INPUT',
+        'Pipe diameter D',
+        'All other parameters'
+      ]
+    },
+    optional: ['Route constraints'],
+    notes: '⚠️ Opens modal for target Q and h_a'
+  }
+};
+
 // Solver constants for dropdowns
 const fluidTypes = ['water_20C', 'water_100F', 'water_60F', 'water_10C', 'air_20C', 'air_80C', 'toluene_114C'];
 const valveKTypes = [
@@ -87,6 +218,7 @@ function App() {
   const [selectedMode, setSelectedMode] = useState('auto');
   const [showExtrasModal, setShowExtrasModal] = useState(false);
   const [extras, setExtras] = useState({ Q: 0.01, h_a: 25, W_shaft: 1000 });
+  const [showModeInfo, setShowModeInfo] = useState(false);
 
   // Global pipe defaults
   const [defaultPipeProps, setDefaultPipeProps] = useState({
@@ -964,7 +1096,31 @@ function App() {
 
         {/* Mode Selection */}
         <div style={{ marginBottom: '15px' }}>
-          <h3 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#333' }}>Solver Mode</h3>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
+            <h3 style={{ margin: 0, fontSize: '14px', color: '#333' }}>Solver Mode</h3>
+            <button
+              onClick={() => setShowModeInfo(true)}
+              style={{
+                marginLeft: '8px',
+                padding: '2px 8px',
+                background: '#007bff',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                fontSize: '11px',
+                fontWeight: 'bold',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '20px',
+                height: '20px'
+              }}
+              title="View solver mode requirements"
+            >
+              i
+            </button>
+          </div>
           <select
             value={selectedMode}
             onChange={(e) => setSelectedMode(e.target.value)}
@@ -1460,6 +1616,142 @@ function App() {
           </div>
         </>
       )}
+
+      {/* Mode Info Modal */}
+      <Modal
+        isOpen={showModeInfo}
+        onRequestClose={() => setShowModeInfo(false)}
+        style={{
+          content: {
+            width: '90%',
+            maxWidth: '700px',
+            height: '80%',
+            maxHeight: '600px',
+            margin: 'auto',
+            padding: '20px',
+            borderRadius: '12px',
+            boxShadow: '0 8px 16px rgba(0,0,0,0.2)',
+            overflow: 'auto'
+          },
+          overlay: {
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            zIndex: 1002,
+          }
+        }}
+      >
+        <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+          <h2 style={{ marginTop: 0, marginBottom: '20px', color: '#2C3E50' }}>
+            📚 Solver Mode Requirements Guide
+          </h2>
+
+          {Object.entries(SOLVER_MODE_INFO).map(([key, info]) => (
+            <div
+              key={key}
+              style={{
+                marginBottom: '25px',
+                padding: '15px',
+                background: selectedMode === key ? '#E3F2FD' : '#F5F5F5',
+                borderRadius: '8px',
+                border: selectedMode === key ? '2px solid #2196F3' : '1px solid #DDD'
+              }}
+            >
+              <h3 style={{
+                margin: '0 0 8px 0',
+                color: '#1976D2',
+                fontSize: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+              }}>
+                {info.name}
+                {selectedMode === key && <span style={{
+                  background: '#4CAF50',
+                  color: 'white',
+                  padding: '2px 8px',
+                  borderRadius: '4px',
+                  fontSize: '11px'
+                }}>CURRENT</span>}
+              </h3>
+
+              <p style={{ margin: '8px 0', color: '#555', fontSize: '13px' }}>
+                <em>{info.description}</em>
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginTop: '12px' }}>
+                <div>
+                  <h4 style={{ margin: '0 0 6px 0', fontSize: '12px', color: '#333', fontWeight: 'bold' }}>
+                    📌 Required Components:
+                  </h4>
+                  <ul style={{ margin: '0', paddingLeft: '20px', fontSize: '12px', color: '#555' }}>
+                    {info.required.components.map((comp, idx) => (
+                      <li key={idx} style={{ marginBottom: '3px' }}>{comp}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div>
+                  <h4 style={{ margin: '0 0 6px 0', fontSize: '12px', color: '#333', fontWeight: 'bold' }}>
+                    🔢 Required Variables:
+                  </h4>
+                  <ul style={{ margin: '0', paddingLeft: '20px', fontSize: '12px', color: '#555' }}>
+                    {info.required.variables.map((variable, idx) => (
+                      <li key={idx} style={{
+                        marginBottom: '3px',
+                        color: variable.includes('REQUIRES MODAL') ? '#FF5722' : '#555',
+                        fontWeight: variable.includes('REQUIRES MODAL') ? 'bold' : 'normal'
+                      }}>
+                        {variable}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              {info.optional && info.optional.length > 0 && (
+                <div style={{ marginTop: '10px' }}>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#666' }}>
+                    ✨ Optional Variables:
+                  </h4>
+                  <div style={{ fontSize: '11px', color: '#777', paddingLeft: '15px' }}>
+                    {info.optional.join(', ')}
+                  </div>
+                </div>
+              )}
+
+              {info.notes && (
+                <div style={{
+                  marginTop: '10px',
+                  padding: '8px',
+                  background: info.notes.includes('⚠️') ? '#FFF3E0' : '#E8F5E9',
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  color: '#555'
+                }}>
+                  <strong>Note:</strong> {info.notes}
+                </div>
+              )}
+            </div>
+          ))}
+
+          <button
+            onClick={() => setShowModeInfo(false)}
+            style={{
+              width: '100%',
+              padding: '12px',
+              background: '#2196F3',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: '14px',
+              marginTop: '20px'
+            }}
+          >
+            Close Guide
+          </button>
+        </div>
+      </Modal>
 
       {/* Extras Modal for modes requiring additional inputs */}
       <Modal
