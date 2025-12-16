@@ -176,26 +176,6 @@ html, body, #root {
   stroke-dasharray: 10,5;
 }
 
-/* Enhanced pipe styling */
-.react-flow__edge {
-  z-index: 1;
-}
-
-.react-flow__edge:hover {
-  filter: drop-shadow(0 0 8px rgba(74, 144, 226, 0.8));
-  transition: all 0.3s ease;
-}
-
-.react-flow__edge path {
-  transition: all 0.3s ease;
-}
-
-/* Pipe labels */
-.react-flow__edge-text {
-  font-family: 'Courier New', monospace;
-  font-size: 12px;
-  font-weight: 600;
-}
 
 /* React Flow customizations */
 .react-flow__node {

@@ -6,7 +6,6 @@ import ReactFlow, {
   Background,
   Controls,
   MiniMap,
-  SmoothStepEdge, // For 90-degree bends with rounded corners
 } from 'reactflow';
 import 'reactflow/dist/style.css'; // Required CSS
 import './App.css';
