@@ -27,16 +27,6 @@ const nodeTypes = {
 
 // Solver Mode Information
 const SOLVER_MODE_INFO = {
-  'auto': {
-    name: 'Auto-Detect',
-    description: 'Automatically selects the best mode based on your diagram components',
-    required: {
-      components: ['Any valid P&ID configuration'],
-      variables: ['Based on detected mode']
-    },
-    optional: [],
-    notes: 'Detects pumps, valves, and system configuration to choose optimal solver'
-  },
   'gravity': {
     name: 'Gravity Flow',
     description: 'Calculates flow rate driven purely by elevation difference and pressure',
@@ -215,7 +205,7 @@ function App() {
   const [formData, setFormData] = useState({}); // Temp state for editing
 
   // Mode selection and extras handling
-  const [selectedMode, setSelectedMode] = useState('auto');
+  const [selectedMode, setSelectedMode] = useState('system_curve');
   const [showExtrasModal, setShowExtrasModal] = useState(false);
   const [extras, setExtras] = useState({ Q: 0.01, h_a: 25, W_shaft: 1000 });
   const [showModeInfo, setShowModeInfo] = useState(false);
@@ -388,20 +378,7 @@ function App() {
         })),
       };
 
-      // Auto-detect solver mode based on system components
-      let effectiveMode = selectedMode;
-      if (effectiveMode === 'auto') {
-        const hasPump = nodes.some(node => node.type === 'pump');
-        const hasPumpWithCurve = nodes.some(node => node.type === 'pump' && node.data?.pump_curve);
-
-        if (hasPumpWithCurve) {
-          effectiveMode = 'operating_point';
-        } else if (hasPump) {
-          effectiveMode = 'given_pump_head';
-        } else {
-          effectiveMode = 'gravity';
-        }
-      }
+      const effectiveMode = selectedMode;
 
       // Check if mode needs extras - open modal if yes
       const modesNeedingExtras = ['inverse_diameter', 'inverse_length', 'given_Q_and_power'];
@@ -1133,7 +1110,6 @@ function App() {
               background: 'white'
             }}
           >
-            <option value="auto">Auto-Detect</option>
             <option value="gravity">Gravity Flow</option>
             <option value="system_curve">System Curve</option>
             <option value="given_pump_head">Fixed Pump Head</option>
@@ -1144,7 +1120,7 @@ function App() {
             <option value="inverse_length">Inverse Length</option>
           </select>
           <small style={{ color: '#666', fontSize: '10px', display: 'block', marginTop: '4px' }}>
-            Auto-detect analyzes your diagram components
+            Select the appropriate solver mode for your system
           </small>
         </div>
 
