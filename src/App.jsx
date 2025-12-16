@@ -303,11 +303,20 @@ function App() {
         const flowRate = results.raw_results?.flow_rate || 0;
         const velocity = results.raw_results?.velocity || 0;
 
+        console.log('Animation Debug:', { flowRate, velocity, results: results.raw_results });
+
         if (flowRate > 0) {
           setEdges((eds) =>
             eds.map((edge) => {
-              // Calculate animation duration based on velocity (faster flow = faster animation)
-              const animationDuration = Math.max(0.1, 0.8 / velocity); // Min 0.1s, faster animation
+              // Calculate animation duration based on velocity
+              // Use velocity if available, otherwise base on flow rate
+              let animationDuration;
+              if (velocity > 0) {
+                animationDuration = Math.max(0.3, 2.0 / velocity); // Slower base speed
+              } else {
+                // Fallback: use flow rate to estimate speed
+                animationDuration = Math.max(0.5, 2.0 / (flowRate * 100));
+              }
 
               return {
                 ...edge,

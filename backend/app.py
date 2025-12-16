@@ -140,7 +140,13 @@ def solve_graph(graph_data: Dict, mode: str, extras: Optional[Dict] = None) -> D
 
         # Get the main results
         flow_rate = result.Q if hasattr(result, 'Q') else 0.0
-        velocity = solver.calculate_velocity(flow_rate, diameter) if flow_rate > 0 else 0.0
+
+        # Calculate velocity safely (Q = A * v, so v = Q / A)
+        if flow_rate > 0:
+            pipe_area = 3.14159 * (diameter / 2) ** 2  # π * r²
+            velocity = flow_rate / pipe_area  # m/s
+        else:
+            velocity = 0.0
 
         # Calculate head loss if flow exists
         if flow_rate > 0:
